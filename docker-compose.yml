@@ -1,0 +1,47 @@
+version: '2'
+
+services:
+
+  cadvisor:
+    image: google/cadvisor:v0.23.1
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    links:
+      - elasticsearch
+    depends_on:
+      - elasticsearch
+    command: >
+             -storage_driver="elasticsearch"
+             -storage_driver_es_host="http://elasticsearch:9200"
+
+
+  elasticsearch:
+    image: elasticsearch:2.3
+    volumes:
+      - ./docker/elasticsearch/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+    ports:
+      - "8901:9200"
+
+  php-supervisor:
+    build:
+      context: .
+      dockerfile: docker/php-supervisor/Dockerfile
+    tty: true
+    stdin_open: true
+    volumes:
+      - ./:/var/www/html
+      - ./docker/php-supervisor/php.ini:/usr/local/etc/php/php.ini
+    working_dir: /var/www/html
+    links:
+      - elasticsearch
+    depends_on:
+      - cadvisor
+    ports:
+      - "8902:9001"
+    command: >
+             sh -c 'supervisord -c ./docker/php-supervisor/supervisord.conf
+             && tail -f /tmp/supervisord.log
+             '
